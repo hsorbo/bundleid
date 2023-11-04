@@ -1,13 +1,15 @@
 use std::{
     env,
+    fs::File,
     io::{Cursor, Read},
 };
 
 fn main() -> Result<(), String> {
     let filename = env::args().nth(1).ok_or("Usage: bundleid filname.ipa")?;
-    let file = std::fs::File::open(&filename).map_err(|error| format!("Error opening file: {error}"))?;
+    let file = File::open(&filename).map_err(|error| format!("Error opening file: {error}"))?;
     let reader = std::io::BufReader::new(file);
-    let mut archive =  zip::ZipArchive::new(reader).map_err(|error| format!("Error opening zip: {error}"))?;
+    let mut archive =
+        zip::ZipArchive::new(reader).map_err(|error| format!("Error opening zip: {error}"))?;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).unwrap();
         let outpath = match entry.enclosed_name() {
@@ -20,8 +22,10 @@ fn main() -> Result<(), String> {
             let reader = Cursor::new(buffer);
             let val = plist::Value::from_reader(reader).unwrap();
             let dict = val.as_dictionary().unwrap();
-            let bundle_id =
-                dict.get("CFBundleIdentifier").unwrap().as_string().unwrap();
+            let bundle_id = dict
+                .get("CFBundleIdentifier")
+                .and_then(|s| s.as_string())
+                .ok_or("No CFBundleIdentifier found")?;
             println!("{bundle_id}");
             return Ok(());
         }
